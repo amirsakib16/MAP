@@ -1,91 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Merchant Delivery Simulation</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
             padding: 20px;
-            background-color: #f5f5f5;
         }
 
         .container {
             background-color: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             max-width: 600px;
             margin: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
 
-        input,
-        button {
-            padding: 10px;
-            margin: 10px 0;
+        input, button {
             width: 100%;
-            font-size: 16px;
+            padding: 10px;
+            margin-top: 10px;
         }
 
-        #graph_image {
+        .section-title {
+            font-weight: bold;
             margin-top: 20px;
-            max-width: 100%;
+        }
+
+        img {
+            margin-top: 20px;
+            width: 100%;
             border: 1px solid #ccc;
             border-radius: 5px;
         }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <label for="start_node">Start Node (0–7):</label>
-<input type="number" id="start_node" min="0" max="7" value="0">
+<div class="container">
+    <label for="start_node">Start Node (0–7):</label>
+    <input type="number" id="start_node" min="0" max="7" value="0" />
 
-<label for="end_node">End Node (0–7):</label>
-<input type="number" id="end_node" min="0" max="7" value="7">
+    <div class="section-title">Customer 1</div>
+    <input type="number" id="c1_time" placeholder="Time to travel" />
+    <input type="number" id="c1_urgency" placeholder="Urgency (higher is more urgent)" />
 
-<button onclick="simulate()">Delivery Route</button>
+    <div class="section-title">Customer 2</div>
+    <input type="number" id="c2_time" placeholder="Time to travel" />
+    <input type="number" id="c2_urgency" placeholder="Urgency (higher is more urgent)" />
 
-        <img id="graph_image" src="" alt="Graph Image" />
+    <button onclick="simulate()">Simulate Delivery</button>
 
-        <div id="result" style="margin-top:20px; font-weight:bold;"></div>
-    </div>
+    <img id="graph_image" src="" alt="Graph Image" />
+    <div id="result"></div>
+</div>
 
-
-    <script>
-        function simulate() {
-    const startNode = parseInt(document.getElementById('start_node').value, 10);
-    const endNode = parseInt(document.getElementById('end_node').value, 10);
+<script>
+function simulate() {
+    const start_node = parseInt(document.getElementById("start_node").value);
+    const c1_time = parseInt(document.getElementById("c1_time").value);
+    const c1_urgency = parseInt(document.getElementById("c1_urgency").value);
+    const c2_time = parseInt(document.getElementById("c2_time").value);
+    const c2_urgency = parseInt(document.getElementById("c2_urgency").value);
 
     fetch('/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start_node: startNode, end_node: endNode })
+        body: JSON.stringify({
+            start_node,
+            c1_time,
+            c1_urgency,
+            c2_time,
+            c2_urgency
+        })
     })
-    .then(response => response.json())
+    .then(res => res.json())
     .then(data => {
-        const img = document.getElementById('graph_image');
-        img.src = data.image_url + '?t=' + new Date().getTime();
-
-        const resultDiv = document.getElementById('result');
-        resultDiv.innerHTML = `
-            <strong>Starting Location:</strong> ${data.start_node} <br/>
-            <strong>End Location:</strong> ${data.end_node} <br/>
-            <strong>Total Time:</strong> ${data.total_time * 10} munites <br/>
-            <strong>Total Delivery Cost:</strong> ${parseInt((data.total_time * 100) / 50)} Yuan <br/>
-            <strong>Path:</strong> ${data.path.join(' ... ')}
+        document.getElementById('graph_image').src = data.image_url + '?t=' + new Date().getTime();
+        document.getElementById('result').innerHTML = `
+            <strong>Selected Customer:</strong> ${data.selected_customer} <br/>
+            <strong>Total Time:</strong> ${data.total_time * 10} minutes <br/>
+            <strong>Total Cost:</strong> ${data.total_cost} Yuan <br/>
+            <strong>Path:</strong> ${data.path.join(" → ")}
         `;
     })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred during simulation.');
+    .catch(err => {
+        console.error(err);
+        alert("Simulation failed.");
     });
 }
-
-
-    </script>
+</script>
 </body>
-
 </html>

@@ -27,71 +27,72 @@ def index():
 def simulate():
     data = request.get_json()
     start_node = int(data.get('start_node', 0))
-    end_node = int(data.get('end_node', 7))
+    c1_time = int(data.get('c1_time'))
+    c1_urgency = int(data.get('c1_urgency'))
+    c2_time = int(data.get('c2_time'))
+    c2_urgency = int(data.get('c2_urgency'))
 
     G, due_times = create_graph()
-    pos = nx.spring_layout(G, seed=42)  # fixed layout for consistency
+    pos = nx.spring_layout(G, seed=42)
 
-    # Priority queue: (time_so_far, current_node, path_list)
-    heap = []
-    heappush(heap, (0, start_node, [start_node]))
+    def find_path(end_node):
+        heap = [(0, start_node, [start_node])]
+        visited = {}
+        while heap:
+            current_time, node, path = heappop(heap)
+            if node == end_node:
+                return path, current_time
+            if node in visited and visited[node] <= current_time:
+                continue
+            visited[node] = current_time
+            for neighbor in G.neighbors(node):
+                if neighbor in path:
+                    continue
+                weight = G[node][neighbor]['weight']
+                arrival_time = current_time + weight
+                if arrival_time <= due_times[neighbor]:
+                    heappush(heap, (arrival_time, neighbor, path + [neighbor]))
+        return [], float('inf')
 
-    visited = dict()  # node: earliest arrival time
+    # Evaluate both customers
+    best = {'customer': None, 'priority': float('inf')}
+    customers = [
+        {'id': 'Customer 1', 'travel_time': c1_time, 'urgency': c1_urgency, 'node': 6},
+        {'id': 'Customer 2', 'travel_time': c2_time, 'urgency': c2_urgency, 'node': 7}
+    ]
 
-    found_path = None
-    total_time = None
+    for customer in customers:
+        path, total_time = find_path(customer['node'])
+        cost = int((total_time * 100) / 50)
+        priority = customer['travel_time'] + cost - customer['urgency']
+        customer.update({'path': path, 'time': total_time, 'cost': cost, 'priority': priority})
 
-    while heap:
-        current_time, current_node, path = heappop(heap)
+        if priority < best['priority']:
+            best = {
+        'customer': customer['id'],
+        'path': path,
+        'total_time': total_time,
+        'total_cost': cost,
+        'node': customer['node'],
+        'priority': priority  # ← Add this line to avoid KeyError
+    }
 
-        if current_node == end_node:
-            found_path = path
-            total_time = current_time
-            break
 
-        if current_node in visited and visited[current_node] <= current_time:
-            continue
-        visited[current_node] = current_time
-
-        for neighbor in G.neighbors(current_node):
-            weight = G[current_node][neighbor]['weight']
-            arrival_time = current_time + weight
-            if arrival_time <= due_times[neighbor] and neighbor not in path:
-                heappush(heap, (arrival_time, neighbor, path + [neighbor]))
-
-    if not found_path:
-        return jsonify({
-            'message': f"No valid delivery path found from {start_node} to {end_node} within due times.",
-            'path': [],
-            'start_node': start_node,
-            'end_node': end_node,
-            'total_time': 0,
-            'image_url': ''
-        })
-
-    # Prepare graph drawing with path highlighted
+    # Draw graph
     edge_colors = []
     for u, v in G.edges():
-        if (u in found_path and v in found_path and abs(found_path.index(u) - found_path.index(v)) == 1):
+        if (u in best['path'] and v in best['path'] and abs(best['path'].index(u) - best['path'].index(v)) == 1):
             edge_colors.append('red')
         else:
             edge_colors.append('gray')
-    edge_alphas = [1.0 if c == 'red' else 0.2 for c in edge_colors]
-
-    node_colors = ['lightgreen' if n in found_path else 'lightgray' for n in G.nodes()]
-    node_alphas = [1.0 if n in found_path else 0.3 for n in G.nodes()]
-    labels = {n: f"{n}\n(due:{due_times[n]})" for n in G.nodes()}
 
     plt.figure(figsize=(8, 6))
-    nx.draw_networkx_nodes(G, pos, node_color=node_colors, alpha=node_alphas, node_size=800)
-    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, alpha=edge_alphas)
-    nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold', font_size=8)
-    edge_labels = nx.get_edge_attributes(G, 'weight')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-
-    plt.title("Google Map")
+    nx.draw(G, pos, with_labels=True,
+            node_color=['green' if n in best['path'] else 'lightgray' for n in G.nodes()],
+            edge_color=edge_colors, node_size=700)
+    nx.draw_networkx_labels(G, pos, labels={n: f"{n}\nDue:{due_times[n]}" for n in G.nodes()}, font_size=8)
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G, 'weight'))
     plt.axis('off')
-    plt.tight_layout()
 
     if not os.path.exists('static'):
         os.makedirs('static')
@@ -99,11 +100,10 @@ def simulate():
     plt.close()
 
     return jsonify({
-        'path': found_path,
-        'start_node': start_node,
-        'end_node': end_node,
-        'total_time': total_time,
-        'message': f"Delivery path from node {start_node} to {end_node}: {found_path} with total time {total_time}",
+        'selected_customer': best['customer'],
+        'path': best['path'],
+        'total_time': best['total_time'],
+        'total_cost': best['total_cost'],
         'image_url': '/static/graph.png'
     })
 
