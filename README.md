@@ -4,7 +4,7 @@ A web-based simulation that visualizes a merchant's delivery route using graph t
 
 ### 🌐 Live Demo
 
-🔗 [Visit the Deployed App](https://map-1-145l.onrender.com)
+🔗 [Visit the Deployed App](https://map-2-na68.onrender.com/)
 
 ---
 
